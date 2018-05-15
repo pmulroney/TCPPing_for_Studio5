@@ -1,6 +1,9 @@
-# ListIntersect
+# TCPPing for Studio 5
 
 The TCPPing command in Omnis is a useful tool, but with the updates in operating systems, no longer works for Studio 5 on MacOS 10.12 (Sierra) and above.  This method has been written to use applescript instead to call the built-in OS command to perform the ping operation.
+
+## NOTE
+The binary library is in Studio 5.2 format.
 
 ## USAGE
 ```omnis
