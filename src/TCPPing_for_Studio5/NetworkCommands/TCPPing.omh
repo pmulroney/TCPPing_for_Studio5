@@ -1,0 +1,47 @@
+;  Perform the equivalent of TCPPing that works for all versions of Mac OS
+;  Returns the ping time in milliseconds, or -1 if there was an error
+
+;  - Sanitise our inputs
+Calculate pnPacketSize as pick(isclear(pnPacketSize),pnPacketSize,56)     ;; If nothing specified, default to 56 bytes.
+Calculate pnTimeout as pick(isclear(pnTimeout),pnTimeout,5)     ;; If timeout not specified, default to 5 seconds.
+
+;  - Get the Operating System version
+Calculate vsOSVersion as sys(7)     ;; OS version as reported by the operating system. Usually in the format eg 10.12.4 - Work out if we need to do any special handling
+Calculate vnMajor as strtok('vsOSVersion','.')     ;; We only need the major/minor version for this test eg 10.12
+Calculate vnMinor as strtok('vsOSVersion','.')
+Calculate vsOSVersion as con(vnMajor,'.',vnMinor)     ;; eg 10.10 -> Yosemite, 10.11 -> El Capitan, 10.12 -> Sierra, 10.13 -> High Sierra
+
+;  - Get the Omnis Studio verison
+Calculate vsStudioVersion as sys(1)     ;; Version of Omnis Studio eg 5.2.2 or 8.0
+Calculate vnMajor as strtok('vsStudioVersion','.')     ;; We only need the major/minor version for this test eg 5.2
+Calculate vnMinor as strtok('vsStudioVersion','.')
+Calculate vsStudioVersion as con(vnMajor,'.',vnMinor)
+
+;  - Apply tests
+If vsStudioVersion>=8.0     ;; For version 8.0 and above, TCPPing works properly agian
+	TCPPing (psHostname,pnPacketSize,pnTimeout) Returns vnPingTime     ;; eg send 56 bytes, 5 second timeout
+Else If pos(sys(6),'WNU')<>0     ;; Studio versions prior to 8.0 on Windows/Linux work properly
+	TCPPing (psHostname,pnPacketSize,pnTimeout) Returns vnPingTime     ;; send 56 bytes, 5 second timeout
+Else If pos(sys(6),'MX')<>0&vsOSVersion<10.12     ;; Mac OS Versions prior to Sierra worked properly...
+	TCPPing (psHostname,pnPacketSize,pnTimeout) Returns vnPingTime     ;; send 56 bytes, 5 second timeout
+Else
+	;  Mac OS, Sierra and above, Studio versions before 8.0, TCP ping is broken
+	Calculate vsCommand as con('do shell script "ping -c 1 -t ',pnTimeout,' -s ',pnPacketSize,' ',psHostname,'"')     ;; Applescript still works!
+	Do $runapplescript(vsCommand,vsResult,vsError) Returns vnResult
+	If vnResult=0     ;; No errors
+		;  Parse result
+		While len(vsResult)     ;; Get the last line: round-trip min/avg/max/stddev = 0.080/0.080/0.080/0.000 ms
+			Calculate vsLine as strtok('vsResult',kCr)
+		End While
+		Calculate vsResult as vsLine
+		For i from 1 to 5 step 1     ;; Get the 5th element = average ping time in seconds
+			Calculate vsLine as strtok('vsResult','/')
+		End For
+		Calculate vnPingTime as vsLine*1000     ;; Convert to milliseconds
+	Else
+		Calculate vnPingTime as -1     ;; Error.  We can't parse the error, don't try.
+	End If
+End If
+Quit method vnPingTime
+;  --- history
+;  11-05-18 PWM   Created.
